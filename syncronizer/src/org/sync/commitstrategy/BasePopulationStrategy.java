@@ -44,6 +44,7 @@ import com.starbase.starteam.RecycleBin;
 import com.starbase.starteam.ServerException;
 import com.starbase.starteam.Type;
 import com.starbase.starteam.View;
+import com.starbase.util.FileUtils;
 
 public class BasePopulationStrategy implements CommitPopulationStrategy {
 
@@ -92,7 +93,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 		lastFiles.removeAll(deletedFiles); // clean files that was never seen from the last files.
 		recoverDeleteInformation(head, root);
 		if (currentCommitList.size() > 0) {
-			setLastCommitTime(currentCommitList.lastKey().getCommitDate());
+			setLastCommitTime(new java.util.Date(currentCommitList.lastKey().getTime()));
 		}
 	}
 
@@ -143,7 +144,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 		for(Item i : f.getItems(f.getTypeNames().FILE)) {
 			if(i instanceof File) {
 				File historyFile = (File) i;
-				String path = gitpath + (gitpath.length() > 0 ? "/" : "") + historyFile.getName();
+                String path = gitpath + (gitpath.length() > 0 ? "/" : "") + historyFile.getName();
 
 				processFileForCommit(head, historyFile, path);
 			} else {
@@ -187,10 +188,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 		}
 		// prefer content version as it is cached in the File object
 		int itemViewVersion = historyFile.getContentVersion();
-		if (fileid != null && fileid != historyFile.getItemID()) {
-			Log.logf("File %s was replaced", path);			
-			createCommitInformation(path, historyFile, 1);
-		} else if (previousContentVersion < 0) {
+		if (previousContentVersion < 0) {
 			createCommitInformation(path, historyFile, 1);
 		} else if (previousContentVersion > itemViewVersion) {
 			Log.logf("File %s was reverted from version %d to %d was skipped", path, previousContentVersion,
@@ -243,10 +241,9 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 	 **/
 	protected boolean isChildOf(File aFile, Folder aPotentialParent) {
 		Folder parent = aFile.getParentFolder();
-		int searchedVersion = aPotentialParent.getViewVersion();
 		while (parent != null) {
 			if (parent.getObjectID() == aPotentialParent.getObjectID()) {
-				return parent.getViewVersion() == searchedVersion;
+				return true;
 			}
 			parent = parent.getParentFolder();
 		}
@@ -328,16 +325,28 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 						String newPath = pathname(item, root);
 						Item renameEventItem = renameFinder.findEventItem(currentView, path, newPath, item,
 						    item.getModifiedTime().getLongValue());
-						if(null != renameEventItem) {
-							if (verbose) {
-								Log.logf("Renamed %s -> %s at %s",
-								    path, newPath,
-										renameEventItem.getModifiedTime());
-							}
-							deleteInfo = new CommitInformation(renameEventItem.getModifiedTime().createDate(),
-									renameEventItem.getModifiedBy(),
-									"",
-									path);
+					      // file was probably renamed during the time period
+				        String oldFolderName = FileUtils.getParent(path, "/");
+				        String folderName = FileUtils.getParent(newPath, "/");
+                        String oldFileName = FileUtils.getName(path, "/");
+				        if (!oldFileName.equals(item.getName()) && folderName.equals(oldFolderName)) {
+                            String newFileName = folderName + (folderName.length() > 0 ? "/" : "") + item.getName();
+				            for (Item historyFile : item.getHistory()) {
+                                Log.logf("File Renamed %s -> %s",
+                                    path, item.getName());
+				                createCommitInformation(newFileName, (File) historyFile, 1);
+				            }
+                            deleteInfo = new CommitInformation(earliestTime.getTime(), item.getModifiedBy(), "", path);
+						} else if(null != renameEventItem) {
+                            if (verbose) {
+                                Log.logf("Renamed %s -> %s at %s",
+                                    path, newPath,
+                                        renameEventItem.getModifiedTime());
+                            }
+                            deleteInfo = new CommitInformation(renameEventItem.getModifiedTime().getLongValue(),
+                                    renameEventItem.getModifiedBy(),
+                                    "",
+                                    path);			        
 						} else {
 							// if it isn't a rename, must be a move operation.
 							if (verbose) {
@@ -348,7 +357,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 							// Not sure how this happens, but fill in with the
 							// only information we have: the last view time
 							// and the last person to modify the item.
-							deleteInfo = new CommitInformation(earliestTime, item.getModifiedBy(), "", path);
+							deleteInfo = new CommitInformation(earliestTime.getTime(), item.getModifiedBy(), "", path);
 						}
 						deleteInfo.setFileDelete(true);
 						ith.remove();
@@ -356,7 +365,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 
 						currentCommitList.put(deleteInfo, item);
 						// Replace the existing entries for item if they have an earlier timestamp.
-						CommitInformation info = new CommitInformation(deleteInfo.getCommitDate(), deleteInfo.getUid(), "", newPath);
+						CommitInformation info = new CommitInformation(deleteInfo.getTime(), deleteInfo.getUid(), "", newPath);
 						replaceEarlierCommitInfo(info, item, root);
 					}
 				}
@@ -383,7 +392,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 			}
 			for (int i = 0; i < deletedpaths.size(); i++) {
 				File item = deletedpaths.get(i).getSecond();
-				CommitInformation info = new CommitInformation(item.getDeletedTime().createDate(),
+				CommitInformation info = new CommitInformation(item.getDeletedTime().getLongValue(),
 						item.getDeletedUserID(),
 						"",
 						deletedpaths.get(i).getFirst());
@@ -415,7 +424,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 				originalValue = entry.getValue();
 				// Time need to match with the delete instruction to be combined
 				// together
-				replacement = new CommitInformation(earliestTime, entry.getKey().getUid(), "Unexpected Move",
+				replacement = new CommitInformation(earliestTime.getTime(), entry.getKey().getUid(), "Unexpected Move",
 				    newPath);
 				it.remove();
 				break;
@@ -444,7 +453,7 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 		// TODO: a better data structure for fileList would make this more efficient.
 		for(Iterator<Map.Entry<CommitInformation, File>> ith = currentCommitList.entrySet().iterator(); ith.hasNext(); ) {
 			CommitInformation info2 = ith.next().getKey();
-			if (path.equals(info2.getPath()) && info2.getCommitDate().before(info.getCommitDate())) {
+			if (path.equals(info2.getPath()) && info2.getTime() < info.getTime()) {
 				ith.remove();
 				return;
 			}
@@ -487,23 +496,21 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 	 *          on the last filePopulation pass
 	 */
 	protected void createCommitInformation(String path, File fileToCommit, int iterationCounter) {
-		String comment = correctedComment(fileToCommit);
 		// This is a patchup time to prevent commit jumping up in time between view labels
-		Date authorDate = new java.util.Date(fileToCommit.getModifiedTime().getLongValue());
-		long timeOfCommit = authorDate.getTime();
-		if (earliestTime != null && earliestTime.getTime() >= timeOfCommit) {
-			// add offset with last commit to keep order. Based on the last commit
-			// from the previous pass + 1 second by counter
-			long newTime = earliestTime.getTime() + (1000 * iterationCounter);
-			if (verbose) {
-				Log.logf("Changing commit time of %s from %d to %d", path, timeOfCommit, newTime);
-			}
-			timeOfCommit = newTime;
-		}
-		Date commitDate = new java.util.Date(timeOfCommit);
+		long timeOfCommit = fileToCommit.getModifiedTime().getLongValue();
+//        String comment = String.valueOf(timeOfCommit) + " qwe " + correctedComment(fileToCommit);
+        String comment = correctedComment(fileToCommit);
+//		if (earliestTime != null && earliestTime.getTime() > timeOfCommit) {
+//			// add offset with last commit to keep order. Based on the last commit
+//			// from the previous pass + 1 second by counter
+//			long newTime = earliestTime.getTime() + (1000 * iterationCounter);
+//			if (verbose) {
+//				Log.logf("Changing commit time of %s from %d to %d", path, timeOfCommit, newTime);
+//			}
+//			timeOfCommit = newTime;
+//		}
 
-		CommitInformation info = new CommitInformation(commitDate, fileToCommit.getModifiedBy(), comment, path);
-		info.setAuthorDate(authorDate);
+		CommitInformation info = new CommitInformation(timeOfCommit, fileToCommit.getModifiedBy(), comment, path);
 		if (verbose) {
 			Log.log("Discovered commit <" + info + ">");
 		}
