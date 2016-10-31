@@ -136,7 +136,7 @@ public class RevisionPopulationTest {
 	@After
 	public void tearDown() throws Exception {
 		LastFiles = CommitBuilder.getLastFiles();
-		EarliestTime = CommitBuilder.getListOfCommit().lastKey().getCommitDate();
+		EarliestTime = new java.util.Date(CommitBuilder.getListOfCommit().lastKey().getTime());
 		CommitBuilder = null;
 		SelectedViewLabels = null;
 	}

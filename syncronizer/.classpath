@@ -1,10 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
-	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="src" path="test"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="src" path="src">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="C:/Program Files/Borland/StarTeam SDK 11.0/lib"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="src" path="test">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="C:/Program Files/Borland/StarTeam SDK 11.0/lib"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="C:/Program Files/Borland/StarTeam SDK 11.0/lib"/>
+		</attributes>
+	</classpathentry>
 	<classpathentry kind="con" path="org.eclipse.jdt.junit.JUNIT_CONTAINER/4"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/jargs"/>
-	<classpathentry combineaccessrules="false" kind="src" path="/fake-starteam"/>
+	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.USER_LIBRARY/jargs"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/fake-starteam">
+		<attributes>
+			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="C:/Program Files/Borland/StarTeam SDK 11.0/lib"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="C:/proj/git-starteam/bin/jargs.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

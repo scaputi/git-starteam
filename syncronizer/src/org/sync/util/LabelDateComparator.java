@@ -25,14 +25,14 @@ public class LabelDateComparator implements Comparator<Label> {
   private AlphanumComparator Fallback = new AlphanumComparator();
 	@Override
 	public int compare(Label arg0, Label arg1) {
-		if(arg0.getRevisionTime().getLongValue() > arg1.getRevisionTime().getLongValue())
-		{
-			return 1;
-		}
-		else if(arg0.getRevisionTime().getLongValue() < arg1.getRevisionTime().getLongValue())
-		{
-			return -1;
-		}
+//		if(arg0.getRevisionTime().getLongValue() > arg1.getRevisionTime().getLongValue())
+//		{
+//			return 1;
+//		}
+//		else if(arg0.getRevisionTime().getLongValue() < arg1.getRevisionTime().getLongValue())
+//		{
+//			return -1;
+//		}
 		return Fallback.compare(arg0.getName(), arg1.getName());
 	}
 
