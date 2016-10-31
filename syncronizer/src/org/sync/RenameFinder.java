@@ -59,7 +59,7 @@ public class RenameFinder {
 				if (time < startTime) {
 					break;
 				}
-				if (i+1 < hist.length &&
+                if (i+1 < hist.length &&
 					item.getName().equals(file.getName()) &&
 					((File)hist[i+1]).getName().equals(oldFileName)) {
 					return item;

@@ -25,6 +25,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Deque;
 import java.util.HashMap;
@@ -65,7 +66,6 @@ import com.starbase.starteam.Project;
 import com.starbase.starteam.PropertyNames;
 import com.starbase.starteam.Server;
 import com.starbase.starteam.ServerException;
-import com.starbase.starteam.User;
 import com.starbase.starteam.UserAccount;
 import com.starbase.starteam.View;
 import com.starbase.starteam.ViewConfiguration;
@@ -90,7 +90,6 @@ public class GitImporter {
 	private Map<String, DataRef> tagMarks = new HashMap<String, DataRef>();
 	// email domain to use
 	private String domain;
-	private UserMapping userMapping;
 	private long lfsMinimumSize = Long.MAX_VALUE;
 	private Pattern lfsRegex;
 	private CommitPopulationStrategy CheckoutStrategy;
@@ -149,29 +148,19 @@ public class GitImporter {
 
 	public void setDomain(String domain) {
 		this.domain = domain;
-		if (this.userMapping != null) {
-			this.userMapping.setDefaultDomain(this.domain);
-		}
 	}
 
-	public void setUserMapping(UserMapping userDirectory) {
-		this.userMapping = userDirectory;
-		if (this.userMapping != null) {
-			this.userMapping.setDefaultDomain(this.domain);
-		}
-	}
-
-	private boolean dontTryServerAdministrationAgain = false;
 	public void generateFastImportStream(View view, String folderPath) {
-		PropertyNames propNames = view.getPropertyNames();
+        PropertyNames propNames = folder.getPropertyNames();
 
+		
 		// http://techpubs.borland.com/starteam/2009/en/sdk_documentation/api/com/starbase/starteam/CheckoutManager.html
 		// said old version (passed in /opt/StarTeamCP_2005r2/lib/starteam80.jar) "Deprecated. Use View.createCheckoutManager() instead."
 		CheckoutManager cm = new CheckoutManager(view);
-		cm.getOptions().setEOLConversionEnabled(false);
+		cm.getOptions().setEOLConversionEnabled(true);
 		// Disabling status update leads to a large performance increase.
 		cm.getOptions().setUpdateStatus(false);
-		lastInformation = new CommitInformation(new java.util.Date(0), Integer.MIN_VALUE, "", "");
+		lastInformation = new CommitInformation(Long.MIN_VALUE, Integer.MIN_VALUE, "", "");
 
 		folder = null;
 		setFolder(view, folderPath);
@@ -190,7 +179,7 @@ public class GitImporter {
 		if(verbose) {
 			Log.out("Populating files");
 		}
-		CheckoutStrategy.filePopulation(head, folder);
+        CheckoutStrategy.filePopulation(head, folder);
 
 		NavigableMap<CommitInformation, File> commitList = CheckoutStrategy.getListOfCommit();
 		if(verbose) {
@@ -209,22 +198,18 @@ public class GitImporter {
 		for (Map.Entry<CommitInformation, File> e : commitList.entrySet()) {
 			File f = e.getValue();
 			CommitInformation current = e.getKey();
-			String userName = "";
-			String userEmail = "";
-			if (!dontTryServerAdministrationAgain) {
-				try {
-					UserAccount userAccount = server.getAdministration().findUserAccount(current.getUid());
-					userName = userAccount.getName();
-					userEmail = userAccount.getEmailAddress();
-				} catch (ServerException ex) {
-					Log.log("Could not retrieve user from Administration Server. You probably do not have the right");
-					dontTryServerAdministrationAgain = true;
+//			UserAccount userAccount = server.getAdministration().findUserAccount(current.getUid());
+//            String userName = userAccount.getName();
+            String userName = "Steve";
+			String userEmail;
+			try {
+				userEmail = "";
+                userName  = server.getUser(current.getUid()).getName();
 				}
-			}
-			if (dontTryServerAdministrationAgain) {
-				User userAccount = server.getUser(current.getUid());
-				userName = userAccount.getName();
-				userEmail = userMapping.getEmail(userName);
+			catch(ServerException ex) {
+				Log.log("Could not retrieve e-mail for " + userName + " from Administration Server. "
+                                        + "You probably do not have the right");
+				userEmail = userName.replaceAll(" ", ".") + "@" + domain;
 			}
 			String path = current.getPath();
 
@@ -342,10 +327,10 @@ public class GitImporter {
 					// validate that the last commit done wasn't newer than the commit we will be doing
 					if (null != lastCommit && lastCommit.getCommitDate().getTime() >= current.getTime()) {
 						// we add a seconds for each time we see a commit that is newer or same as the previous commit.
-						commitDate = new java.util.Date(lastCommit.getCommitDate().getTime() + 1000);
+						commitDate = new java.util.Date(current.getTime() + 1000);
+//	                      commitDate = new java.util.Date(lastCommit.getCommitDate().getTime() + 1000);
 					}
 					commit = new Commit(userName, userEmail, current.getComment(), head, commitDate);
-					commit.setAuthorDate(current.getAuthorDate());
 					
 					commit.addFileOperation(fo);
 					if (fattributes != null) {
@@ -386,9 +371,6 @@ public class GitImporter {
 				java.util.Date janitorTime;
 				if(view.getConfiguration().isTimeBased()) {
 					janitorTime = new java.util.Date(view.getConfiguration().getTime().getLongValue());
-					if (janitorTime.before(lastCommit.getCommitDate())) {
-						janitorTime = new java.util.Date(lastCommit.getCommitDate().getTime() + 1000);
-					}
 				} else {
 					janitorTime = lastCommit.getCommitDate(); //At this stage, there should always be a last commit
 				}
@@ -417,7 +399,6 @@ public class GitImporter {
 						} catch (InvalidPathException e1) {
 							e1.printStackTrace();
 						}
-						repositoryHelper.unregisterFileId(head, path);
 					}
 				}
 				lastCommit = commit;
@@ -522,7 +503,7 @@ public class GitImporter {
 				}
 			}
 		}
-		
+//		Collections.reverse(viewLabels);
 		return viewLabels.toArray(new Label[0]);
 	}
 	
@@ -556,6 +537,7 @@ public class GitImporter {
 		}
 		
 		Arrays.sort(revisionLabels, new RevisionDateComparator());
+
 		int fromLabel = 0;
 		
 		if(isResume) {
@@ -620,14 +602,9 @@ public class GitImporter {
 			
 			if(i == fromLabel && isResume) {
 				SmallRef targettedHead = new SmallRef(head);
-				List<LogEntry> oldCommits = repositoryHelper.getCommitLog(targettedHead);
+				List<LogEntry> oldCommits = repositoryHelper.getCommitLog(targettedHead, targettedHead);
 				if (oldCommits.size() > 0) {
 					CheckoutStrategy.setLastCommitTime(oldCommits.get(0).getTimeOfCommit());
-				}
-				else {
-					if (verbose) {
-						Log.log("No parent commit found while resuming importation for <" + head + ">");
-					}					
 				}
 				CheckoutStrategy.setInitialPathList(repositoryHelper.getListOfTrackedFile(head));
 			}
@@ -852,9 +829,7 @@ public class GitImporter {
 				// Sanitize trailing dot
 				.replaceFirst("\\.$", "_")
 				// Sanitize "
-		    .replaceAll("\"", "_")
-		    // Remove Starting dot
-		    .replaceAll("^\\.", "_");
+				.replaceAll("\"", "_");
 	}
 
 	private void writeLabelTag(View view, Label label) {
