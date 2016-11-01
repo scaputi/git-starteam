@@ -328,7 +328,19 @@ public class BasePopulationStrategy implements CommitPopulationStrategy {
 						String newPath = pathname(item, root);
 						Item renameEventItem = renameFinder.findEventItem(currentView, path, newPath, item,
 						    item.getModifiedTime().getLongValue());
-						if(null != renameEventItem) {
+					      // file was probably renamed during the time period
+						String oldFolderName = FileUtils.getParent(path, "/");
+						String folderName = FileUtils.getParent(newPath, "/");
+						String oldFileName = FileUtils.getName(path, "/");
+						if (!oldFileName.equals(item.getName()) && folderName.equals(oldFolderName)) {
+						String newFileName = folderName + (folderName.length() > 0 ? "/" : "") + item.getName();
+						for (Item historyFile : item.getHistory()) {
+							 Log.logf("File Renamed %s -> %s",
+							 path, item.getName());
+				                createCommitInformation(newFileName, (File) historyFile, 1);
+						}
+								deleteInfo = new CommitInformation(earliestTime.getTime(), item.getModifiedBy(), "", path);
+						} else if(null != renameEventItem) {
 							if (verbose) {
 								Log.logf("Renamed %s -> %s at %s",
 								    path, newPath,
